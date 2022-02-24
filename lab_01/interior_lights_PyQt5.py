@@ -395,6 +395,8 @@ class Ui_MainWindow(object):
         self.setcarLight(self.white)
         self.sweep_leds(-1)
 
+        self.index = 1
+        self.KL_lights('')
 
 
     # Open one led when interior lights is pressed  
@@ -464,9 +466,6 @@ class Ui_MainWindow(object):
             if progressBarValue > spinBoxValue:
                 self.change_pb_down_value(progressBarValue)
 
-        pass
-        ''' complete with necesarry code '''
-
     # Change led brightness down when the spinbox value (representing led brightness percentage) is less than progress bar value
     def change_pb_down_value(self, value):
         self.progress_bar.setValue(value - 1)
@@ -526,7 +525,6 @@ class Ui_MainWindow(object):
         self.KL_75.setStyleSheet("background-color:" + str(l4) + ";border-radius:5px;")
 
     ############################### EXERCISE 5 ##############################
-    ################################ BONUS ################################
     # Open left door untill the obstacle is detected
     def open_door_left(self):
         val = self.spinBox_left.value()
