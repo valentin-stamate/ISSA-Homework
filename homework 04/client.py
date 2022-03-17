@@ -10,6 +10,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import socket
 import threading
 import sys, time
+import _pickle as pk
 
 HOST = 'localhost'
 PORT = 5005
@@ -23,6 +24,8 @@ led2_flag = False
 led3_flag = False
 
 class Ui_MainWindow(object):
+    server = None
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(658, 500)
@@ -151,6 +154,16 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
+        self.set_led0.setEnabled(False)
+        self.set_led1.setEnabled(False)
+        self.set_led2.setEnabled(False)
+        self.set_led3.setEnabled(False)
+
+        self.dtc3.setEnabled(False)
+        self.dtc2.setEnabled(False)
+        self.dtc1.setEnabled(False)
+        self.dtc4.setEnabled(False)
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
@@ -177,6 +190,22 @@ class Ui_MainWindow(object):
         self.connect.setText(_translate("MainWindow", "CONNECT"))
 
 ############################### EXERCISE 0 ###############################
+    diag_mode = False
+
+    def refresh_diag(self):
+        self.set_led0.setEnabled(self.diag_mode)
+        self.set_led1.setEnabled(self.diag_mode)
+        self.set_led2.setEnabled(self.diag_mode)
+        self.set_led3.setEnabled(self.diag_mode)
+
+        self.dtc3.setEnabled(self.diag_mode)
+        self.dtc2.setEnabled(self.diag_mode)
+        self.dtc1.setEnabled(self.diag_mode)
+        self.dtc4.setEnabled(self.diag_mode)
+
+        self.diagMode.setEnabled(not self.diag_mode)
+        self.diagMode_off.setEnabled(self.diag_mode)
+
     def start_client(self):
         self.diagMode.setEnabled(True)
         self.diagMode_off.setEnabled(False)
@@ -211,12 +240,80 @@ class Ui_MainWindow(object):
         self.led1_state.setVisible(False)
         self.led2_state.setVisible(False)
         self.led3_state.setVisible(False)
-        ''' Complete with necessary code'''
+
+        print('Starting client')
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((HOST, PORT))
+        self.server = s
+
+        self.refresh_diag()
+
+        self.recv_messages()
 
 
 ############################### EXERCISE 1 ###############################
     def recv_handler(self,stop_event):
-        pass
+        while True:
+            msg = pk.loads(self.server.recv(1024))
+            print(f'Received {msg}')
+
+            if msg.startswith('0x6201'):
+                color = str(msg)[6:]
+
+                if color == '00000':
+                    self.set_dtc1_state(0)
+                elif color == '25500':
+                    self.set_dtc1_state(1)
+                elif color == '02550':
+                    self.set_dtc1_state(2)
+            elif msg.startswith('0x6202'):
+                color = str(msg)[6:]
+
+                if color == '00000':
+                    self.set_dtc2_state(0)
+                elif color == '25500':
+                    self.set_dtc2_state(1)
+                elif color == '02550':
+                    self.set_dtc2_state(2)
+            elif msg.startswith('0x6203'):
+                color = str(msg)[6:]
+
+                if color == '00000':
+                    self.set_dtc3_state(0)
+                elif color == '25500':
+                    self.set_dtc3_state(1)
+                elif color == '02550':
+                    self.set_dtc3_state(2)
+
+            elif msg.startswith('0x6204'):
+                color = str(msg)[6:]
+
+                if color == '00000':
+                    self.set_dtc4_state(0)
+                elif color == '25500':
+                    self.set_dtc4_state(1)
+                elif color == '02550':
+                    self.set_dtc4_state(2)
+            elif msg.startswith('0x2E'):
+                led = msg[5:6]
+                label = msg[6:]
+
+                if led == '1':
+                    self.set_led0_label(int(label))
+
+                if led == '2':
+                    self.set_led1_label(int(label))
+
+                if led == '3':
+                    self.set_led2_label(int(label))
+
+                if led == '4':
+                    self.set_led3_label(int(label))
+
+
+    def send_to_server(self, msg):
+        print(f'Sending {msg}')
+        self.server.sendall(pk.dumps(msg))
 
     def recv_messages(self):
         self.stop_event = threading.Event()
@@ -224,68 +321,145 @@ class Ui_MainWindow(object):
         self.c_thread.start()
 
     def diag(self):
-        pass
+        self.diag_mode = True
+        self.refresh_diag()
 
     def stop_diag(self):
-        pass
+        self.diag_mode = False
+        self.refresh_diag()
 
 
 ############################### EXERCISE 3 ###############################        
     # READ DTC's
     def get_dtc_state(self,dtc_string):
-        pass
+        msg = f'0x22{dtc_string}'
+        self.send_to_server(msg)
 
 
     # SET DTC1 State
-    def set_dtc1_state(self,data_recv):
-        pass
+    def set_dtc1_state(self, data_recv):
+        if data_recv == 0:
+            self.dtc1_state.setText('Unknown')
+            self.dtc1_state.setStyleSheet('font:bold; color: blue')
+
+        elif data_recv == 1:
+            self.dtc1_state.setText('Inactive')
+            self.dtc1_state.setStyleSheet('font:bold; color: red')
+
+        elif data_recv == 2:
+            self.dtc1_state.setText('Active')
+            self.dtc1_state.setStyleSheet('font:bold; color: green')
 
     # SET DTC2 State
     def set_dtc2_state(self,data_recv):
-        pass
+        if data_recv == 0:
+            self.dtc2_state.setText('Unknown')
+            self.dtc2_state.setStyleSheet('font:bold; color: blue')
+
+        elif data_recv == 1:
+            self.dtc2_state.setText('Inactive')
+            self.dtc2_state.setStyleSheet('font:bold; color: red')
+
+        elif data_recv == 2:
+            self.dtc2_state.setText('Active')
+            self.dtc2_state.setStyleSheet('font:bold; color: green')
 
     # SET DTC3 State
     def set_dtc3_state(self,data_recv):
-        pass
+        if data_recv == 0:
+            self.dtc3_state.setText('Unknown')
+            self.dtc3_state.setStyleSheet('font:bold; color: blue')
+
+        elif data_recv == 1:
+            self.dtc3_state.setText('Inactive')
+            self.dtc3_state.setStyleSheet('font:bold; color: red')
+
+        elif data_recv == 2:
+            self.dtc3_state.setText('Active')
+            self.dtc3_state.setStyleSheet('font:bold; color: green')
 
     # SET DTC4 State
     def set_dtc4_state(self,data_recv):
-        pass
+        if data_recv == 0:
+            self.dtc4_state.setText('Unknown')
+            self.dtc4_state.setStyleSheet('font:bold; color: blue')
+
+        elif data_recv == 1:
+            self.dtc4_state.setText('Inactive')
+            self.dtc4_state.setStyleSheet('font:bold; color: red')
+
+        elif data_recv == 2:
+            self.dtc4_state.setText('Active')
+            self.dtc4_state.setStyleSheet('font:bold; color: green')
 
 ############################### EXERCISE 4 ###############################
 
     # SET LED0
-    def set_led0_label(self,data_recv):
-        pass
+    def set_led0_label(self, data_recv):
+        self.led0_state.setVisible(True)
 
+        if data_recv == 0:
+            self.led0_state.setVisible(False)
+        elif data_recv == 1:
+            self.led0_state.setStyleSheet(f'border-radius:12; background-color: red')
+        elif data_recv == 2:
+            self.led0_state.setStyleSheet(f'border-radius:12; background-color: green')
+
+    led0_flag = 0
     def set_led0_flags(self):
-        pass
-
+        self.led0_flag += 1
+        self.send_to_server(f'0x2E01{self.led0_flag % 3}')
 
     # SET LED1
     def set_led1_label(self,data_recv):
-        pass
+        self.led1_state.setVisible(True)
 
-  
+        if data_recv == 0:
+            self.led1_state.setVisible(False)
+        elif data_recv == 1:
+            self.led1_state.setStyleSheet(f'border-radius:12; background-color: red')
+        elif data_recv == 2:
+            self.led1_state.setStyleSheet(f'border-radius:12; background-color: green')
+
+    led1_flag = 0
     def set_led1_flags(self):
-        pass
+        self.led1_flag += 1
+        self.send_to_server(f'0x2E02{self.led1_flag % 3}')
 
 
     # SET LED2
     def set_led2_label(self,data_recv):
-        pass
+        self.led2_state.setVisible(True)
+
+        if data_recv == 0:
+            self.led2_state.setVisible(False)
+        elif data_recv == 1:
+            self.led2_state.setStyleSheet(f'border-radius:12; background-color: red')
+        elif data_recv == 2:
+            self.led2_state.setStyleSheet(f'border-radius:12; background-color: green')
 
 
+    led2_flag = 0
     def set_led2_flags(self):
-        pass
+        self.led2_flag += 1
+        self.send_to_server(f'0x2E03{self.led2_flag % 3}')
 
 
     # SET LED3
     def set_led3_label(self,data_recv):
-        pass
+        self.led3_state.setVisible(True)
 
+        if data_recv == 0:
+            self.led3_state.setVisible(False)
+        elif data_recv == 1:
+            self.led3_state.setStyleSheet(f'border-radius:12; background-color: red')
+        elif data_recv == 2:
+            self.led3_state.setStyleSheet(f'border-radius:12; background-color: green')
+
+    led3_flag = 0
     def set_led3_flags(self):
-        pass    
+        self.led3_flag += 1
+        self.send_to_server(f'0x2E04{self.led3_flag % 3}')
 
 ##########################################################################
 
